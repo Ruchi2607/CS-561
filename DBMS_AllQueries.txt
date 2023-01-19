@@ -1,0 +1,148 @@
+
+Name: Ruchi Pandey
+
+CWID NO: 10473603
+
+
+--Query 1:
+
+WITH main_query as (SELECT cust, MIN(quant) As MIN_Quantity, MAX(quant) As MAX_Quantity, AVG(quant) As AVG_Q
+FROM sales
+GROUP BY cust),
+
+MIN_SALE AS 
+(
+Select MQ.cust, MIN_Quantity, sal.prod, sal.day, sal.month, sal.year, sal.state
+FROM main_query MQ , sales sal
+WHERE MQ.cust = sal.cust AND MIN_Quantity = Sal.quant
+),
+MAX_SALE AS
+(
+Select MQ2.cust, MAX_Quantity, sal.prod, sal.day, sal.month, sal.year, sal.state
+FROM main_query MQ2 , sales sal
+WHERE MQ2.cust= sal.cust AND MAX_Quantity = sal.quant
+)
+SELECT MQ.cust, MQ.MIN_Quantity, MIN.prod,concat(MIN.month,'/',MIN.day,'/',MIN.year) as MIN_DATE, MIN.state as MIN_State,MQ.MAX_Quantity, MAX.prod, concat(MAX.day,'/', MAX.month,'/', MAX.year) as MAX_DATE, MAX.state  as MIN_STATE, ROUND(MQ.AVG_Q) as AVG_Q
+FROM MIN_SALE AS MIN, MAX_SALE AS MAX, main_query AS MQ
+WHERE MIN.cust = MAX.cust AND MIN.cust = MQ.cust AND MAX.cust = MQ.cust
+
+
+
+--Query 2:
+
+WITH T1 AS
+(
+ SELECT cust AS CUSTOMER,prod AS PRODUCT, MAX(quant) AS OCT_MAX
+ FROM sales
+ where year > 2017 AND month = 10
+ GROUP BY prod, cust
+ ORDER BY prod, cust),
+ 
+ T2 AS
+ (SELECT t1.*, sal.date AS OCT_DATE
+ FROM T1 t1 , sales sal
+ Where t1.CUSTOMER = sal.cust AND t1.PRODUCT = sal.prod AND sal.quant = T1.oct_max AND year > 2017 AND month = 10
+  ),
+
+T3 AS (
+ SELECT t.CUSTOMER,t.PRODUCT, MIN(quant) AS NOV_MIN
+ FROM T1 t, sales sal
+ WHERE month = 11 AND t.CUSTOMER = sal.cust AND t.PRODUCT = sal.prod
+ GROUP BY CUSTOMER, PRODUCT
+),
+ T33 AS 
+ (
+ SELECT t3.*, sal.date AS NOV_DATE
+ FROM T3 t3 , sales sal
+ Where t3.CUSTOMER = sal.cust AND t3.PRODUCT = sal.prod AND sal.quant = T3.NOV_MIN AND month = 11
+ ),
+ T4 AS 
+ (
+ SELECT t12.CUSTOMER, t12.PRODUCT, MIN(quant) AS DEC_MIN
+ FROM T1 t12, sales sal
+ WHERE month = 12 AND T12.CUSTOMER = sal.cust AND T12. PRODUCT = sal.prod
+ GROUP BY CUSTOMER, PRODUCT
+ ),
+ T44 AS 
+ (
+ SELECT t4.*, sal.date AS DEC_DATE
+ FROM T4 t4 , sales sal
+ Where t4.CUSTOMER = sal.cust AND t4.PRODUCT = sal.prod AND sal.quant = T4.DEC_MIN AND month = 12
+ ),
+ 
+ T5 AS 
+ (
+SELECT T2.*,T33.NOV_MIN,T33.NOV_DATE
+FROM T2, T33
+WHERE T2.CUSTOMER = t33.CUSTOMER AND T2.PRODUCT = T33.PRODUCT
+)
+
+SELECT T5.*, T44.DEC_MIN, T44.DEC_DATE
+FROM T5, T44
+WHERE T5.CUSTOMER = T44.CUSTOMER AND T5.PRODUCT = T44.PRODUCT
+ 
+
+ 
+--Query 3:
+
+WITH main_query3 AS (select month, prod, sum(quant) from sales 
+ group by month, prod
+ order By month ASC),
+ 
+ m_popu as (Select distinct on (month) month, prod , sum from main_query3 order by month, sum desc),
+ 
+ l_popu as (Select distinct on (month) month, prod, sum from main_query3 order by month, sum asc)	
+ 
+ select m_popu.month, m_popu.prod as most_popular_prod, m_popu.sum as most_pop_total_q, l_popu.prod as least_popular_prod, l_popu.sum as least_pop_total_q
+ from m_popu join l_popu using (month);
+
+
+--Query 4:
+
+WITH report4 As (select prod, SUM(quant) As SUM_Q, month
+	from sales
+	group by prod, month
+	ORDER BY MONTH, prod),
+ 
+query4 As
+	(SELECT MAX(SUM_Q) as MAX_Q, MIN(SUM_Q) As MIN_Q, prod
+	from report4
+	group by prod),
+
+MAX_Q As(
+	SELECT report4.prod,query4.MAX_Q,report4.month As MOST_FAV_MO,query4.MIN_Q
+	from report4, query4
+	WHERE report4.SUM_Q=query4.MAX_Q and report4.prod=query4.prod)
+	
+SELECT MAX_Q.prod,MAX_Q.MOST_FAV_MO,report4.month As LEAST_FAV_MO
+from report4,MAX_Q
+WHERE report4.prod=MAX_Q.prod and report4.SUM_Q=MAX_Q.MIN_Q;
+
+
+--QUERY 5:
+
+WITH T1 AS (Select prod, cust, ROUND(AVG(quant)),SUM(quant),COUNT(quant) 
+		 from sales
+		 group by prod, cust),
+		 
+	T2 As (Select prod, cust,ROUND(AVG(quant)) as CT_AVG from sales where state = 'CT' AND Year BETWEEN 2016 AND 2021
+		 group by prod, cust),
+		 
+	T3 AS (Select prod, cust, ROUND(AVG(quant)) as NY_AVG from sales where state = 'NY' AND Year BETWEEN 2016 AND 2021
+		group by prod, cust),
+		 
+	T4 As (Select prod, cust, ROUND(AVG(quant)) as NJ_AVG from sales where state = 'NJ' AND Year BETWEEN 2016 AND 2021
+		group by prod, cust),
+	
+	T5 As (Select prod, cust, ROUND(AVG(quant)) as PA_AVG from sales where state = 'PA' AND Year BETWEEN 2016 AND 2021
+		group by prod, cust)
+		
+Select T1.prod, T1.cust,T2.CT_AVG, T3.NY_AVG, T4.NJ_AVG, T5.PA_AVG,T1.ROUND as AVERAGE, T1.SUM as TOTAL, T1.Count as COUNT
+		FROM T1 LEFT JOIN T2 ON T2.cust = T1.cust AND T2.prod = T1.prod
+		LEFT JOIN T3 ON T3.cust = T1.cust AND T3.prod = T1.prod
+		LEFT JOIN T4 ON T4.cust = T1.cust AND T4.prod = T1.prod
+		LEFT JOIN T5 ON T5.cust = T1.cust AND T5.prod = T1.prod
+
+
+
+
